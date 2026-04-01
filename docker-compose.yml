@@ -108,7 +108,7 @@ services:
         - PGID=1000
         - PUID=1000
         - TIMEZONE=UTC
-        - USERNAME=deploy
+        - USERNAME=default
     networks:
       - internal
     ports:

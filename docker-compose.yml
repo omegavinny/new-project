@@ -1,0 +1,119 @@
+networks:
+  internal:
+    driver: bridge
+
+services:
+  ### Mailpit: only dev mode
+  mailpit:
+    image: axllent/mailpit
+    networks:
+      - internal
+    ports:
+      - "8125:8025"
+      - "1125:1025"
+
+  ### Nginx: all modes
+  nginx:
+    build:
+      context: .docker/nginx
+      args:
+        - PHP_UPSTREAM_CONTAINER=php-fpm
+        - PHP_UPSTREAM_PORT=9000
+        - PGID=82
+        - PUID=82
+        - TIMEZONE=UTC
+        - USERNANE=www-data
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    depends_on:
+      - php-fpm
+    networks:
+      - internal
+    ports:
+      - "80:80"
+      - "81:81"
+      - "443:443"
+    volumes:
+      - ./:/var/www:cached
+      - ./.docker/nginx/logs:/var/log/nginx
+      - ./.docker/nginx/ssl:/etc/nginx/ssl
+      - ./.docker/nginx/default.conf:/etc/nginx/sites-available/default.conf
+
+  ### PHP-FPM: all modes
+  php-fpm:
+    build:
+      context: .docker/php-fpm
+      args:
+        - PHP_VERSION=8.4
+        - PGID=1000
+        - PUID=1000
+        - TIMEZONE=UTC
+        - USERNANE=www-data
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    networks:
+      - internal
+    volumes:
+      - ./:/var/www:cached
+      - ./.docker/php-fpm/php8.4.ini:/usr/local/etc/php/php.ini
+
+  ### Postgres: all modes
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_ROOT_PASSWORD: ${DB_PASSWORD}
+    networks:
+      - internal
+    ports:
+      - "5432:5432"
+
+  ### Redis: all modes
+  redis:
+    image: redis:latest
+    networks:
+      - internal
+    ports:
+      - "6379:6379"
+
+  ### Supervisor: all modes
+  supervisor:
+    build:
+      context: .docker/supervisor
+      args:
+        - PHP_VERSION=8.4
+        - PGID=1000
+        - PUID=1000
+        - TIMEZONE=UTC
+        - USERNAME=default
+    networks:
+      - internal
+    restart: always
+    tty: true
+    volumes:
+      - ./:/var/www:cached
+      - ./.docker/supervisor/conf.d:/etc/supervisor/conf.d
+
+  ### Workspace: all modes
+  workspace:
+    build:
+      context: .docker/workspace
+      args:
+        - NODE_VERSION=24
+        - PHP_VERSION=8.4
+        - PGID=1000
+        - PUID=1000
+        - TIMEZONE=UTC
+        - USERNAME=deploy
+    networks:
+      - internal
+    ports:
+      - "5173:5173"
+    restart: always
+    tty: true
+    volumes:
+      - ./:/var/www:cached
